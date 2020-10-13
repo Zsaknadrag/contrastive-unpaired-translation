@@ -64,7 +64,12 @@ class CUTModel(BaseModel):
 
         if opt.nce_idt and self.isTrain:
             self.loss_names += ['NCE_Y']
+            self.loss_names += ['mean_NCE_Y']
+            self.loss_mean_NCE_Y = 0.0
             self.visual_names += ['idt_B']
+
+        self.loss_names += ['mean_G_GAN', 'mean_D_real', 'mean_D_fake', 'mean_G', 'mean_NCE']
+        self.loss_mean_G_GAN, self.loss_mean_D_fake, self.loss_mean_D_real, self.loss_mean_G, self.loss_mean_NCE = 0.0, 0.0, 0.0, 0.0, 0.0
 
         if self.isTrain:
             self.model_names = ['G', 'F', 'D']
@@ -169,6 +174,9 @@ class CUTModel(BaseModel):
 
         # combine loss and calculate gradients
         self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
+        self.loss_mean_D_fake = 0.999 * self.loss_mean_D_fake + 0.001 * self.loss_D_fake
+        self.loss_mean_D_real = 0.999 * self.loss_mean_D_real + 0.001 * self.loss_D_real
+
         return self.loss_D
 
     def compute_G_loss(self):
@@ -188,11 +196,16 @@ class CUTModel(BaseModel):
 
         if self.opt.nce_idt and self.opt.lambda_NCE > 0.0:
             self.loss_NCE_Y = self.calculate_NCE_loss(self.real_B, self.idt_B)
+            self.loss_mean_NCE_Y = 0.999 * self.loss_mean_NCE_Y + 0.001 * self.loss_NCE_Y
             loss_NCE_both = (self.loss_NCE + self.loss_NCE_Y) * 0.5
         else:
             loss_NCE_both = self.loss_NCE
 
         self.loss_G = self.loss_G_GAN + loss_NCE_both
+
+        self.loss_mean_G_GAN = 0.999 * self.loss_mean_G_GAN + 0.001 * self.loss_G_GAN
+        self.loss_mean_G = 0.999 * self.loss_mean_G + 0.001 * self.loss_G
+        self.loss_mean_NCE = 0.999 * self.loss_mean_NCE + 0.001 * self.loss_NCE
         return self.loss_G
 
     def calculate_NCE_loss(self, src, tgt):
